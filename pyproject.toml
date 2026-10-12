@@ -1,0 +1,23 @@
+[project]
+name = "mta-kit"
+version = "0.1.0"
+description = "多触点归因（Multi-Touch Attribution）算法库：统一接口 + 可评估基准"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["numpy", "pandas"]
+
+[project.optional-dependencies]
+dev = ["pytest", "matplotlib", "ruff"]
+torch = ["torch"]
+datasets = ["pyarrow"]
+
+[tool.pytest.ini_options]
+markers = ["criteo: 需要下载 Criteo 数据集的集成测试"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["mta*"]

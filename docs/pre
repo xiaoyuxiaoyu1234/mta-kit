@@ -1,0 +1,105 @@
+- generic [ref=f1e2]:
+  - heading "mta-kit 多触点归因交互演示" [level=1] [ref=f1e3]
+  - paragraph [ref=f1e4]: 用户的转化功劳该归给哪个广告渠道？切换归因模型，看预算分配如何被改写。
+  - generic [ref=f1e5]:
+    - heading "① 输入转化路径" [level=2] [ref=f1e6]
+    - generic [ref=f1e7]:
+      - text: 每行一条路径：
+      - code [ref=f1e8]: 渠道A > 渠道B > 渠道C, 转化/未转化 [, 收入]
+      - text: （渠道名任意，逗号或中文顿号分隔均可）
+    - textbox [ref=f1e9]: 短视频 > 信息流 > 搜索广告 > 再营销, 转化 搜索广告, 转化 短视频 > 再营销, 转化 信息流 > 搜索广告, 转化 短视频 > 信息流 > 再营销, 转化 搜索广告 > 再营销, 未转化 短视频, 未转化 信息流 > 短视频 > 搜索广告 > 再营销, 转化 再营销, 转化 短视频 > 搜索广告, 转化 信息流, 未转化 短视频 > 信息流, 未转化
+    - generic [ref=f1e10]:
+      - button "▶ 计算归因" [ref=f1e11] [cursor=pointer]
+      - button "载入示例数据" [ref=f1e12] [cursor=pointer]
+      - button "🎲 生成模拟数据（有真实因果机制）" [ref=f1e13] [cursor=pointer]
+  - generic [ref=f1e15]:
+    - heading "② 选择归因模型" [level=2] [ref=f1e16]
+    - generic [ref=f1e17]:
+      - generic [ref=f1e18] [cursor=pointer]:
+        - checkbox "末次触点" [checked] [ref=f1e19]
+        - text: 末次触点
+      - generic [ref=f1e20] [cursor=pointer]:
+        - checkbox "首次触点" [checked] [ref=f1e21]
+        - text: 首次触点
+      - generic [ref=f1e22] [cursor=pointer]:
+        - checkbox "线性" [checked] [ref=f1e23]
+        - text: 线性
+      - generic [ref=f1e24] [cursor=pointer]:
+        - checkbox "U型位置" [checked] [ref=f1e25]
+        - text: U型位置
+      - generic [ref=f1e26] [cursor=pointer]:
+        - checkbox "时间衰减" [checked] [ref=f1e27]
+        - text: 时间衰减
+      - generic [ref=f1e28] [cursor=pointer]:
+        - checkbox "Shapley" [checked] [ref=f1e29]
+        - text: Shapley
+      - generic [ref=f1e30] [cursor=pointer]:
+        - checkbox "Markov移除" [checked] [ref=f1e31]
+        - text: Markov移除
+  - generic [ref=f1e32]:
+    - heading "③ 各渠道功劳占比（对比各模型）" [level=2] [ref=f1e34]
+    - generic [ref=f1e37]:
+      - heading "④ 单模型视图（Shapley）" [level=2] [ref=f1e38]
+      - generic [ref=f1e39]: 选择模型查看饼图与明细：
+      - combobox [ref=f1e40]:
+        - option "末次触点" [selected]
+        - option "首次触点"
+        - option "线性"
+        - option "U型位置"
+        - option "时间衰减"
+        - option "Shapley"
+        - option "Markov移除"
+  - generic [ref=f1e43]:
+    - heading "⑤ 明细数据" [level=2] [ref=f1e44]
+    - table [ref=f1e46]:
+      - rowgroup [ref=f1e47]:
+        - row [ref=f1e48]:
+          - columnheader "渠道" [ref=f1e49]
+          - columnheader "末次触点" [ref=f1e50]
+          - columnheader "首次触点" [ref=f1e51]
+          - columnheader "线性" [ref=f1e52]
+          - columnheader "U型位置" [ref=f1e53]
+          - columnheader "时间衰减" [ref=f1e54]
+          - columnheader "Shapley" [ref=f1e55]
+          - columnheader "Markov移除" [ref=f1e56]
+        - row [ref=f1e57]:
+          - cell "信息流" [ref=f1e58]
+          - cell "0.00%" [ref=f1e59]
+          - cell "25.00%" [ref=f1e60]
+          - cell "16.67%" [ref=f1e61]
+          - cell "15.00%" [ref=f1e62]
+          - cell "13.35%" [ref=f1e63]
+          - cell "16.67%" [ref=f1e64]
+          - cell "17.37%" [ref=f1e65]
+        - row [ref=f1e66]:
+          - cell "再营销" [ref=f1e67]
+          - cell "62.50%" [ref=f1e68]
+          - cell "12.50%" [ref=f1e69]
+          - cell "29.17%" [ref=f1e70]
+          - cell "33.75%" [ref=f1e71]
+          - cell "35.25%" [ref=f1e72]
+          - cell "29.17%" [ref=f1e73]
+          - cell "28.49%" [ref=f1e74]
+        - row [ref=f1e75]:
+          - cell "搜索广告" [ref=f1e76]
+          - cell "37.50%" [ref=f1e77]
+          - cell "12.50%" [ref=f1e78]
+          - cell "31.25%" [ref=f1e79]
+          - cell "27.50%" [ref=f1e80]
+          - cell "34.05%" [ref=f1e81]
+          - cell "31.25%" [ref=f1e82]
+          - cell "31.34%" [ref=f1e83]
+        - row [ref=f1e84]:
+          - cell "短视频" [ref=f1e85]
+          - cell "0.00%" [ref=f1e86]
+          - cell "50.00%" [ref=f1e87]
+          - cell "22.92%" [ref=f1e88]
+          - cell "23.75%" [ref=f1e89]
+          - cell "17.35%" [ref=f1e90]
+          - cell "22.92%" [ref=f1e91]
+          - cell "22.80%" [ref=f1e92]
+  - paragraph [ref=f1e93]:
+    - text: 本页面为
+    - link "mta-kit" [ref=f1e94] [cursor=pointer]:
+      - /url: https://github.com/yourname/mta-kit
+    - text: 的纯前端演示， Python 完整实现（含模拟器因果基准 / MCP Server / Criteo 数据集）见仓库 · MIT License

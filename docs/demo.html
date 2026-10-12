@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mta-kit — 多触点归因交互演示</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1420; --card: #171e2e; --border: #2a3450;
+    --text: #e8ecf5; --muted: #8b96ad; --accent: #4f8cff; --good: #2ecc71;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    background: var(--bg); color: var(--text); padding: 32px 16px; line-height: 1.6;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  h1 { font-size: 26px; margin-bottom: 4px; }
+  h1 .k { color: var(--accent); }
+  .sub { color: var(--muted); margin-bottom: 24px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; margin-bottom: 20px;
+  }
+  .card h2 { font-size: 16px; margin-bottom: 12px; color: var(--accent); }
+  label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px; }
+  textarea {
+    width: 100%; min-height: 150px; background: #0d1220; color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 13px; resize: vertical;
+  }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+  button {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 9px 18px; font-size: 14px; cursor: pointer; transition: opacity .15s;
+  }
+  button:hover { opacity: .85; }
+  button.ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  .models { display: flex; gap: 14px; flex-wrap: wrap; }
+  .models label { display: flex; align-items: center; gap: 5px; color: var(--text);
+    font-size: 14px; cursor: pointer; margin: 0; }
+  .err { color: #ff6b6b; font-size: 13px; min-height: 20px; margin-top: 8px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+  .pie-wrap { position: relative; height: 280px; }
+  .bar-wrap { position: relative; height: 300px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  th, td { border-bottom: 1px solid var(--border); padding: 7px 10px; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 500; }
+  .foot { color: var(--muted); font-size: 12px; margin-top: 28px; text-align: center; }
+  .foot a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>mta<span class="k">-kit</span> 多触点归因交互演示</h1>
+  <p class="sub">用户的转化功劳该归给哪个广告渠道？切换归因模型，看预算分配如何被改写。</p>
+
+  <div class="card">
+    <h2>① 输入转化路径</h2>
+    <label>每行一条路径：<code>渠道A &gt; 渠道B &gt; 渠道C, 转化/未转化 [, 收入]</code>（渠道名任意，逗号或中文顿号分隔均可）</label>
+    <textarea id="input"></textarea>
+    <div class="row">
+      <button onclick="run()">▶ 计算归因</button>
+      <button class="ghost" onclick="loadSample()">载入示例数据</button>
+      <span style="display:flex;align-items:center;gap:6px;">
+        <button class="ghost" onclick="simulate()">🎲 生成模拟数据</button>
+        <label style="margin:0;color:var(--muted);font-size:13px;">用户数
+          <input id="simN" type="number" value="300" min="50" max="20000" step="50"
+                 style="width:80px;background:#0d1220;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;">
+        </label>
+      </span>
+    </div>
+    <div class="err" id="err"></div>
+  </div>
+
+  <div class="card">
+    <h2>② 选择归因模型</h2>
+    <div class="models" id="modelBox"></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>③ 各渠道功劳占比（对比各模型）</h2>
+      <div class="bar-wrap"><canvas id="barChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>④ 单模型视图</h2>
+      <label>选择模型查看饼图与明细：</label>
+      <select id="pieModel" style="background:#0d1220;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;"></select>
+      <div class="pie-wrap" style="margin-top:12px;"><canvas id="pieChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>⑤ 明细数据</h2>
+    <div id="table"></div>
+  </div>
+
+  <p class="foot">
+    本页面为 <a href="https://github.com/xiaoyuxiaoyu1234/mta-kit">mta-kit</a> 的纯前端演示，
+    Python 完整实现（含模拟器因果基准 / MCP Server / Criteo 数据集）见仓库 · MIT License
+  </p>
+</div>
+
+<script>
+"use strict";
+
+/* ================= 归因模型（与 Python 版对齐的 JS 实现） ================= */
+
+const parseCSVLine = s => s.split(/[,,、>]+/).map(x => x.trim()).filter(Boolean);
+
+function parseInput(text) {
+  const journeys = [];
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const parts = line.split(",").map(x => x.trim()).filter(Boolean);
+    if (parts.length < 2) throw `无法解析行: "${line}"（需要 渠道路径, 转化/未转化）`;
+    const conv = /^(1|true|y|转化|converted)$/i.test(parts[1]);
+    const revenue = parts.length > 2 ? (parseFloat(parts[2]) || 1) : 1;
+    const tps = parseCSVLine(parts[0]);
+    if (!tps.length) throw `路径为空: "${line}"`;
+    journeys.push({ tps, converted: conv, revenue });
+  }
+  if (!journeys.length) throw "没有有效数据";
+  return journeys;
+}
+
+function channelsOf(js) {
+  const s = new Set();
+  js.forEach(j => j.tps.forEach(t => s.add(t)));
+  return [...s].sort();
+}
+
+/* --- 启发式 --- */
+function heuristicWeights(js, channels, kind) {
+  const scores = Object.fromEntries(channels.map(c => [c, 0]));
+  for (const j of js) {
+    if (!j.converted) continue;
+    const n = j.tps.length;
+    const w = j.tps.map((_, i) => {
+      if (kind === "last")  return i === n - 1 ? 1 : 0;
+      if (kind === "first") return i === 0 ? 1 : 0;
+      if (kind === "linear") return 1 / n;
+      if (kind === "position") {
+        if (n === 1) return 1;
+        if (n === 2) return 0.5;
+        if (i === 0 || i === n - 1) return 0.4;
+        return 0.2 / (n - 2);
+      }
+      if (kind === "decay") {
+        const halfLife = 2, lam = Math.log(2) / halfLife;
+        return Math.exp(-lam * (n - 1 - i));
+      }
+      return 0;
+    });
+    const sum = w.reduce((a, b) => a + b, 0);
+    j.tps.forEach((t, i) => { scores[t] += (w[i] / sum) * j.revenue; });
+  }
+  return scores;
+}
+
+/* --- Shapley（精确，≤12 渠道） --- */
+function shapley(js, channels) {
+  const n = channels.length;
+  if (n > 14) throw `Shapley 精确解最多支持 14 个渠道（当前 ${n}），请先合并长尾渠道`;
+  // v(S) = Σ 转化价值 × [路径触点集 ⊆ S]
+  const touchSets = new Map(); // bitmask -> revenue
+  for (const j of js) {
+    if (!j.converted) continue;
+    let mask = 0;
+    [...new Set(j.tps)].forEach(t => mask |= (1 << channels.indexOf(t)));
+    touchSets.set(mask, (touchSets.get(mask) || 0) + j.revenue);
+  }
+  const v = S => {
+    let total = 0;
+    for (const [mask, rev] of touchSets) if ((mask & S) === mask) total += rev;
+    return total;
+  };
+  const fact = k => (k <= 1 ? 1 : k * fact(k - 1));
+  const shap = Object.fromEntries(channels.map(c => [c, 0]));
+  for (let ci = 0; ci < n; ci++) {
+    const others = channels.filter((_, i) => i !== ci);
+    for (let k = 0; k < n; k++) {
+      // 遍历 others 的 k-子集
+      const idx = others.map((_, i) => i);
+      const combos = kCombinations(idx, k);
+      for (const combo of combos) {
+        let S = 1 << ci;
+        combo.forEach(i => S |= (1 << channels.indexOf(others[i])));
+        const marginal = v(S) - v(S & ~(1 << ci));
+        shap[channels[ci]] += (fact(k) * fact(n - k - 1) / fact(n)) * marginal;
+      }
+    }
+  }
+  return shap;
+}
+
+function kCombinations(arr, k) {
+  const res = [];
+  const rec = (start, cur) => {
+    if (cur.length === k) { res.push([...cur]); return; }
+    for (let i = start; i < arr.length; i++) { cur.push(arr[i]); rec(i + 1, cur); cur.pop(); }
+  };
+  rec(0, []);
+  return res;
+}
+
+/* --- Markov 移除效应 --- */
+function markov(js, channels) {
+  const START = "(start)", CONV = "(conv)", NULL = "(null)";
+  const counts = new Map();
+  const add = (a, b, n = 1) => {
+    if (!counts.has(a)) counts.set(a, new Map());
+    const m = counts.get(a);
+    m.set(b, (m.get(b) || 0) + n);
+  };
+  for (const j of js) {
+    const states = [START, ...j.tps, j.converted ? CONV : NULL];
+    for (let i = 1; i < states.length; i++) add(states[i - 1], states[i]);
+  }
+  // 从 src 出发的原始总流量（用于移除时分母不重归一）
+  const totals = new Map();
+  for (const [a, m] of counts) totals.set(a, [...m.values()].reduce((x, y) => x + y, 0));
+
+  function convProb(removed) {
+    const probs = new Map();
+    for (const [a, m] of counts) {
+      const denom = totals.get(a);
+      const t = {};
+      for (const [b, n] of m) {
+        let dst = b;
+        if (removed && (b === removed || a === removed)) dst = NULL;
+        t[dst] = (t[dst] || 0) + n / denom;
+      }
+      probs.set(a, t);
+    }
+    const val = new Map([[START, 0], [CONV, 1], [NULL, 0]]);
+    for (let it = 0; it < 300; it++) {
+      let delta = 0;
+      for (const [a, t] of probs) {
+        if (a === CONV || a === NULL) continue;
+        let v0 = 0;
+        for (const [b, p] of Object.entries(t)) v0 += (val.get(b) || 0) * p;
+        delta = Math.max(delta, Math.abs(v0 - (val.get(a) || 0)));
+        val.set(a, v0);
+      }
+      if (delta < 1e-12) break;
+    }
+    return val.get(START) || 0;
+  }
+
+  const pFull = convProb(null);
+  const scores = {};
+  for (const c of channels) {
+    const p = convProb(c);
+    scores[c] = pFull > 0 ? Math.max(0, (pFull - p) / pFull) : 0;
+  }
+  return scores;
+}
+
+const MODELS = [
+  { key: "last_touch",  name: "末次触点",  fn: (js, ch) => heuristicWeights(js, ch, "last") },
+  { key: "first_touch", name: "首次触点",  fn: (js, ch) => heuristicWeights(js, ch, "first") },
+  { key: "linear",      name: "线性",      fn: (js, ch) => heuristicWeights(js, ch, "linear") },
+  { key: "position",    name: "U型位置",   fn: (js, ch) => heuristicWeights(js, ch, "position") },
+  { key: "time_decay",  name: "时间衰减",  fn: (js, ch) => heuristicWeights(js, ch, "decay") },
+  { key: "shapley",     name: "Shapley",   fn: shapley },
+  { key: "markov",      name: "Markov移除", fn: markov },
+];
+
+/* ================= 模拟数据生成器（与 Python 版机制对齐） ================= */
+
+function simulateJourneys(nUsers) {
+  const specs = [
+    { name: "搜索广告", pConvert: 0.08, pExit: 0.05, entry: 0.40 },
+    { name: "信息流",   pConvert: 0.05, pExit: 0.08, entry: 0.30 },
+    { name: "短视频",   pConvert: 0.02, pExit: 0.10, entry: 0.20 },
+    { name: "再营销",   pConvert: 0.15, pExit: 0.03, entry: 0.10 },
+  ];
+  const trans = { "搜索广告": ["信息流", "短视频", "再营销"], "信息流": ["搜索广告", "短视频", "再营销"],
+                  "短视频": ["搜索广告", "信息流", "再营销"], "再营销": ["搜索广告", "信息流", "短视频"] };
+  const lines = [];
+  for (let u = 0; u < nUsers; u++) {
+    let r = Math.random(), cur = specs[specs.length - 1].name;
+    for (const s of specs) { r -= s.entry; if (r <= 0) { cur = s.name; break; } }
+    const path = [cur];
+    let converted = false;
+    for (let step = 0; step < 6; step++) {
+      const spec = specs.find(s => s.name === cur);
+      const r2 = Math.random();
+      if (r2 < spec.pConvert) { converted = true; break; }
+      if (r2 < spec.pConvert + spec.pExit) break;
+      const opts = trans[cur];
+      cur = opts[Math.floor(Math.random() * opts.length)];
+      path.push(cur);
+    }
+    lines.push(`${path.join(" > ")}, ${converted ? "转化" : "未转化"}`);
+  }
+  return lines.join("\n");
+}
+
+const SAMPLE = [
+  "短视频 > 信息流 > 搜索广告 > 再营销, 转化",
+  "搜索广告, 转化",
+  "短视频 > 再营销, 转化",
+  "信息流 > 搜索广告, 转化",
+  "短视频 > 信息流 > 再营销, 转化",
+  "搜索广告 > 再营销, 未转化",
+  "短视频, 未转化",
+  "信息流 > 短视频 > 搜索广告 > 再营销, 转化",
+  "再营销, 转化",
+  "短视频 > 搜索广告, 转化",
+  "信息流, 未转化",
+  "短视频 > 信息流, 未转化",
+].join("\n");
+
+/* ================= 渲染 ================= */
+
+let barChart = null, pieChart = null;
+let lastResults = null;
+
+function run() {
+  const errEl = document.getElementById("err");
+  errEl.textContent = "";
+  let journeys, channels;
+  try {
+    journeys = parseInput(document.getElementById("input").value);
+    channels = channelsOf(journeys);
+  } catch (e) { errEl.textContent = "❌ " + e; return; }
+
+  const results = {};
+  for (const m of MODELS) {
+    try {
+      const scores = m.fn(journeys, channels);
+      const total = Object.values(scores).reduce((a, b) => a + b, 0) || 1;
+      results[m.key] = Object.fromEntries(
+        Object.entries(scores).map(([c, v]) => [c, v / total])
+      );
+    } catch (e) { errEl.textContent = "❌ " + m.name + ": " + e; return; }
+  }
+  lastResults = { results, channels };
+
+  // 模型复选框
+  const box = document.getElementById("modelBox");
+  box.innerHTML = "";
+  for (const m of MODELS) {
+    const lab = document.createElement("label");
+    lab.innerHTML = `<input type="checkbox" checked value="${m.key}"> ${m.name}`;
+    box.appendChild(lab);
+  }
+  box.querySelectorAll("input").forEach(cb => cb.addEventListener("change", drawCharts));
+
+  // 饼图选择器
+  const sel = document.getElementById("pieModel");
+  sel.innerHTML = MODELS.map(m => `<option value="${m.key}">${m.name}</option>`).join("");
+  sel.onchange = drawCharts;
+
+  drawCharts();
+  drawTable();
+}
+
+function drawCharts() {
+  if (!lastResults) return;
+  const { results, channels } = lastResults;
+  const active = [...document.querySelectorAll("#modelBox input:checked")].map(x => x.value);
+  const palette = ["#4f8cff", "#2ecc71", "#f39c12", "#e74c3c", "#9b59b6", "#1abc9c", "#e67e22"];
+
+  // 柱状图
+  const datasets = active.map((key, i) => {
+    const m = MODELS.find(x => x.key === key);
+    return {
+      label: m.name,
+      data: channels.map(c => (results[key][c] || 0) * 100),
+      backgroundColor: palette[i % palette.length] + "cc",
+    };
+  });
+  if (barChart) barChart.destroy();
+  barChart = new Chart(document.getElementById("barChart"), {
+    type: "bar",
+    data: { labels: channels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { y: { title: { display: true, text: "归因占比 %" }, ticks: { color: "#8b96ad" },
+                     grid: { color: "#2a3450" } },
+                x: { ticks: { color: "#8b96ad" }, grid: { display: false } } },
+      plugins: { legend: { labels: { color: "#e8ecf5" } } }
+    }
+  });
+
+  // 饼图
+  const pieKey = document.getElementById("pieModel").value;
+  const pm = MODELS.find(x => x.key === pieKey);
+  if (pieChart) pieChart.destroy();
+  pieChart = new Chart(document.getElementById("pieChart"), {
+    type: "doughnut",
+    data: {
+      labels: channels,
+      datasets: [{
+        data: channels.map(c => ((results[pieKey] || {})[c] || 0) * 100),
+        backgroundColor: palette,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        title: { display: true, text: `${pm.name} 的渠道功劳分配`, color: "#e8ecf5" },
+        legend: { position: "right", labels: { color: "#e8ecf5" } },
+        tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed.toFixed(1)}%` } }
+      }
+    }
+  });
+}
+
+function drawTable() {
+  if (!lastResults) return;
+  const { results, channels } = lastResults;
+  let html = "<table><tr><th>渠道</th>";
+  for (const m of MODELS) html += `<th>${m.name}</th>`;
+  html += "</tr>";
+  for (const c of channels) {
+    html += `<tr><td>${c}</td>`;
+    for (const m of MODELS) html += `<td>${((results[m.key] || {})[c] * 100 || 0).toFixed(2)}%</td>`;
+    html += "</tr>";
+  }
+  html += "</table>";
+  document.getElementById("table").innerHTML = html;
+}
+
+function loadSample() {
+  document.getElementById("input").value = SAMPLE;
+  run();
+}
+
+function simulate() {
+  const n = Math.max(50, Math.min(20000, parseInt(document.getElementById("simN").value) || 300));
+  document.getElementById("input").value = simulateJourneys(n);
+  run();
+}
+
+/* 初始化 */
+document.getElementById("input").value = SAMPLE;
+run();
+</script>
+</body>
+</html>
